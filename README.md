@@ -1,5 +1,7 @@
 # Istio lua filter
 
+[Please see the discussion for context.](https://github.com/istio/istio/discussions/49297)
+
 Make sure you have Istio installed and working, and enable sidecar injection.
 
 There are 3 namespaces in play:
