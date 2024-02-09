@@ -1,0 +1,46 @@
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: flex-proxy
+  namespace: hello
+spec:
+  configPatches:
+    - applyTo: HTTP_FILTER
+      match:
+        context: SIDECAR_INBOUND
+        listener:
+          filterChain:
+            filter:
+              name: "envoy.filters.network.http_connection_manager"
+              subFilter:
+                name: "envoy.filters.http.router"
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: envoy.filters.http.lua
+          typed_config:
+            "@type": "type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua"
+            inline_code: |
+              function envoy_on_request(request_handle)
+                local reqBody = request_handle:body(true)
+                request_handle:logInfo("Filter")
+
+                if request_handle:headers():get("x-flex-env") then
+                  request_handle:logInfo("Redirected")
+
+                  local reqHeaders = {}
+                  for name,value in pairs(request_handle:headers()) do
+                    if reqHeaders[name] ~= nil then
+                      reqHeaders[name] = reqHeaders[name]..","..value
+                    else
+                      reqHeaders[name] = value
+                    end
+                  end
+
+                  local upHeaders, upBody = request_handle:httpCall(
+                    "outbound|8000||httpbin.flex.svc.cluster.local", reqHeaders, "", 30000
+                  )
+                  request_handle:respond(upHeaders, upBody)
+                end
+              end
